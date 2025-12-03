@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Micron Production Tracking - Live Dashboard</title>
+    <title>Dashboard - Micron Production Tracking</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="/components/header.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -16,15 +17,15 @@
             padding: 20px;
         }
         .container { max-width: 1400px; margin: 0 auto; }
-        .header {
+        .page-header {
             background: white;
             padding: 20px 30px;
             border-radius: 10px;
             margin-bottom: 20px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        .header h1 { color: #333; margin-bottom: 5px; }
-        .header p { color: #666; font-size: 14px; }
+        .page-header h1 { color: #333; }
+        .page-header p { color: #666; font-size: 14px; }
         .error-banner {
             background: #fee;
             border: 2px solid #fcc;
@@ -165,7 +166,12 @@
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div class="container" id="root"></div>
+    
+    <script>
+        // Add navigation header
+        initNavigation('dashboard');
+    </script>
     
     <script type="text/babel">
         const { useState, useEffect } = React;
@@ -212,21 +218,15 @@
             };
             
             if (loading) {
-                return <div className="container"><div className="loading">⏳ Loading dashboard...</div></div>;
+                return <div className="loading">⏳ Loading dashboard...</div>;
             }
             
             if (error) {
                 return (
-                    <div className="container">
+                    <div>
                         <div className="error-banner">
                             <h3>❌ Error Loading Dashboard</h3>
                             <p><strong>{error}</strong></p>
-                            <p>Please check:</p>
-                            <ul>
-                                <li>Database connection in <code>api/config.php</code></li>
-                                <li>Database tables exist (run <code>database.sql</code>)</li>
-                                <li>Visit <code>/api/debug.php</code> for detailed diagnostics</li>
-                            </ul>
                             <button onClick={loadDashboard} className="btn btn-primary" style={{marginTop: '15px'}}>
                                 Retry
                             </button>
@@ -237,11 +237,9 @@
             
             if (!dashboardData || !dashboardData.parts) {
                 return (
-                    <div className="container">
-                        <div className="empty-state">
-                            <h3>No data available</h3>
-                            <p>Import complete_parts_insertion.sql to add parts</p>
-                        </div>
+                    <div className="empty-state">
+                        <h3>No data available</h3>
+                        <p>Import complete_parts_insertion.sql to add parts</p>
                     </div>
                 );
             }
@@ -250,20 +248,20 @@
             const parts = dashboardData.parts || [];
             
             return (
-                <div className="container">
-                    <div className="header">
-                        <h1>🏭 Micron Production Tracking</h1>
-                        <p>Live component and materials tracking system</p>
+                <div>
+                    <div className="page-header">
+                        <h1>📊 Production Dashboard</h1>
+                        <p>Real-time inventory and stage tracking</p>
                     </div>
                     
                     <div className="stats-grid">
                         <div className="stat-card">
-                            <h3>Total Inventory</h3>
-                            <div className="value">{stats.total_inventory || 0}</div>
+                            <h3>Total Ordered</h3>
+                            <div className="value">{stats.total_ordered || 0}</div>
                         </div>
                         <div className="stat-card good">
-                            <h3>Good Parts</h3>
-                            <div className="value">{stats.total_good || 0}</div>
+                            <h3>Produced</h3>
+                            <div className="value">{stats.total_produced || 0}</div>
                         </div>
                         <div className="stat-card rework">
                             <h3>Rework</h3>
@@ -279,7 +277,7 @@
                         <div className="sidebar">
                             <h2>Parts ({parts.length})</h2>
                             {parts.length === 0 ? (
-                                <p style={{color: '#666', fontSize: '14px'}}>No parts found. Import SQL files.</p>
+                                <p style={{color: '#666', fontSize: '14px'}}>No parts found</p>
                             ) : (
                                 <ul className="part-list">
                                     {parts.map(part => (
@@ -290,7 +288,7 @@
                                         >
                                             <div className="part-number">{part.part_number}</div>
                                             <div className="part-info">
-                                                {part.total_stages} stages · {part.total_inventory || 0} units
+                                                {part.total_stages} stages
                                             </div>
                                         </li>
                                     ))}
@@ -301,51 +299,12 @@
                         <div className="dashboard">
                             {selectedPart ? (
                                 <>
-                                    <h2>📊 {selectedPart.part_number} - Stage Dashboard</h2>
-                                    <div className="stage-flow">
-                                        {(selectedPart.stage_inventory || []).map((stage, idx) => (
-                                            <div key={idx} className="stage-card">
-                                                <div className="stage-header">
-                                                    <div className="stage-name">{stage.stage_name}</div>
-                                                    <div className="stage-order">Stage {stage.stage_order}</div>
-                                                </div>
-                                                <div className="stage-metrics">
-                                                    <div className="metric total">
-                                                        <div className="metric-label">Total</div>
-                                                        <div className="metric-value">{stage.quantity || 0}</div>
-                                                    </div>
-                                                    <div className="metric good">
-                                                        <div className="metric-label">Good</div>
-                                                        <div className="metric-value">{stage.good_quantity || 0}</div>
-                                                    </div>
-                                                    <div className="metric rework">
-                                                        <div className="metric-label">Rework</div>
-                                                        <div className="metric-value">{stage.rework_quantity || 0}</div>
-                                                    </div>
-                                                    <div className="metric rejected">
-                                                        <div className="metric-label">Rejected</div>
-                                                        <div className="metric-value">{stage.rejected_quantity || 0}</div>
-                                                    </div>
-                                                </div>
-                                                {stage.bins && stage.bins.length > 0 && (
-                                                    <div className="bins-section">
-                                                        <div className="bins-title">📦 Active Bins:</div>
-                                                        <div className="bin-tags">
-                                                            {stage.bins.map((bin, bidx) => (
-                                                                <div key={bidx} className="bin-tag">
-                                                                    {bin.bin_barcode}: {bin.quantity} units
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <h2>📈 {selectedPart.part_number} - Stage View</h2>
+                                    <p style={{color: '#666', marginBottom: '20px'}}>{selectedPart.part_name}</p>
                                 </>
                             ) : (
                                 <div className="empty-state">
-                                    <h3>Select a part to view dashboard</h3>
+                                    <h3>Select a part to view details</h3>
                                 </div>
                             )}
                         </div>
