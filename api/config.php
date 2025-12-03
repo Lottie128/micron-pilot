@@ -11,9 +11,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // Database configuration
 define('DB_HOST', 'localhost');
-define('DB_USER', 'your_db_user');
+define('DB_USER', 'zerothqd_micron_admin_128');
 define('DB_PASS', 'your_db_password');
-define('DB_NAME', 'micron_tracking');
+define('DB_NAME', 'zerothqd_micron_tracking_app');
 
 // Create database connection
 function getDBConnection() {
