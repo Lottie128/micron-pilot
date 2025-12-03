@@ -44,6 +44,27 @@
             font-size: 14px;
         }
         
+        .error-banner {
+            background: #fee;
+            border: 2px solid #fcc;
+            color: #c00;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .error-banner h3 {
+            margin-bottom: 10px;
+        }
+        
+        .error-banner pre {
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -87,6 +108,8 @@
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             height: fit-content;
+            max-height: 80vh;
+            overflow-y: auto;
         }
         
         .sidebar h2 {
@@ -306,19 +329,11 @@
             box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
         }
         
-        .btn-success {
-            background: #10b981;
-            color: white;
-        }
-        
-        .btn-success:hover {
-            background: #059669;
-        }
-        
         .loading {
             text-align: center;
             padding: 40px;
-            color: #666;
+            color: white;
+            font-size: 18px;
         }
         
         .empty-state {
@@ -344,6 +359,7 @@
         
         function App() {
             const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
             const [dashboardData, setDashboardData] = useState(null);
             const [selectedPart, setSelectedPart] = useState(null);
             const [formData, setFormData] = useState({
@@ -358,22 +374,37 @@
             
             useEffect(() => {
                 loadDashboard();
-                const interval = setInterval(loadDashboard, 5000); // Refresh every 5 seconds
+                const interval = setInterval(loadDashboard, 10000); // Refresh every 10 seconds
                 return () => clearInterval(interval);
             }, []);
             
             const loadDashboard = async () => {
                 try {
+                    setError(null);
                     const response = await fetch(`${API_BASE}/dashboard.php`);
+                    
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`Server returned ${response.status}: ${errorText}`);
+                    }
+                    
                     const data = await response.json();
+                    
+                    if (!data.success) {
+                        throw new Error(data.error || 'Failed to load dashboard');
+                    }
+                    
                     setDashboardData(data);
-                    if (!selectedPart && data.parts.length > 0) {
+                    
+                    if (!selectedPart && data.parts && data.parts.length > 0) {
                         setSelectedPart(data.parts[0]);
                         setFormData(prev => ({ ...prev, part_id: data.parts[0].id }));
                     }
+                    
                     setLoading(false);
                 } catch (error) {
                     console.error('Failed to load dashboard:', error);
+                    setError(error.message);
                     setLoading(false);
                 }
             };
@@ -416,20 +447,58 @@
                             rejected_quantity: ''
                         });
                         loadDashboard();
+                    } else {
+                        const errorData = await response.json();
+                        alert('Error: ' + (errorData.error || 'Failed to update'));
                     }
                 } catch (error) {
                     console.error('Failed to update inventory:', error);
-                    alert('Failed to update inventory');
+                    alert('Failed to update inventory: ' + error.message);
                 }
             };
             
             if (loading) {
-                return <div className="loading">Loading dashboard...</div>;
+                return (
+                    <div className="container">
+                        <div className="loading">⏳ Loading dashboard...</div>
+                    </div>
+                );
             }
             
-            if (!dashboardData) {
-                return <div className="empty-state"><h3>No data available</h3></div>;
+            if (error) {
+                return (
+                    <div className="container">
+                        <div className="error-banner">
+                            <h3>❌ Error Loading Dashboard</h3>
+                            <p><strong>{error}</strong></p>
+                            <p>Please check:</p>
+                            <ul>
+                                <li>Database connection in <code>api/config.php</code></li>
+                                <li>Database tables exist (run <code>database.sql</code>)</li>
+                                <li>Visit <code>/api/debug.php</code> for detailed diagnostics</li>
+                            </ul>
+                            <button onClick={loadDashboard} className="btn btn-primary" style={{marginTop: '15px'}}>
+                                Retry
+                            </button>
+                        </div>
+                    </div>
+                );
             }
+            
+            if (!dashboardData || !dashboardData.parts) {
+                return (
+                    <div className="container">
+                        <div className="empty-state">
+                            <h3>No data available</h3>
+                            <p>Import complete_parts_insertion.sql to add parts</p>
+                        </div>
+                    </div>
+                );
+            }
+            
+            const stats = dashboardData.stats || {};
+            const parts = dashboardData.parts || [];
+            const bins = dashboardData.bins || [];
             
             return (
                 <div className="container">
@@ -441,39 +510,43 @@
                     <div className="stats-grid">
                         <div className="stat-card">
                             <h3>Total Inventory</h3>
-                            <div className="value">{dashboardData.stats.total_inventory}</div>
+                            <div className="value">{stats.total_inventory || 0}</div>
                         </div>
                         <div className="stat-card good">
                             <h3>Good Parts</h3>
-                            <div className="value">{dashboardData.stats.total_good}</div>
+                            <div className="value">{stats.total_good || 0}</div>
                         </div>
                         <div className="stat-card rework">
                             <h3>Rework</h3>
-                            <div className="value">{dashboardData.stats.total_rework}</div>
+                            <div className="value">{stats.total_rework || 0}</div>
                         </div>
                         <div className="stat-card rejected">
                             <h3>Rejected</h3>
-                            <div className="value">{dashboardData.stats.total_rejected}</div>
+                            <div className="value">{stats.total_rejected || 0}</div>
                         </div>
                     </div>
                     
                     <div className="main-content">
                         <div className="sidebar">
-                            <h2>Parts ({dashboardData.parts.length})</h2>
-                            <ul className="part-list">
-                                {dashboardData.parts.map(part => (
-                                    <li 
-                                        key={part.id}
-                                        className={`part-item ${selectedPart?.id === part.id ? 'active' : ''}`}
-                                        onClick={() => handlePartSelect(part)}
-                                    >
-                                        <div className="part-number">{part.part_number}</div>
-                                        <div className="part-info">
-                                            {part.total_stages} stages · {part.total_inventory} units
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
+                            <h2>Parts ({parts.length})</h2>
+                            {parts.length === 0 ? (
+                                <p style={{color: '#666', fontSize: '14px'}}>No parts found. Import SQL files.</p>
+                            ) : (
+                                <ul className="part-list">
+                                    {parts.map(part => (
+                                        <li 
+                                            key={part.id}
+                                            className={`part-item ${selectedPart?.id === part.id ? 'active' : ''}`}
+                                            onClick={() => handlePartSelect(part)}
+                                        >
+                                            <div className="part-number">{part.part_number}</div>
+                                            <div className="part-info">
+                                                {part.total_stages} stages · {part.total_inventory || 0} units
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                         </div>
                         
                         <div className="dashboard">
@@ -494,8 +567,8 @@
                                                         required
                                                     >
                                                         <option value="">Select stage</option>
-                                                        {selectedPart.stage_inventory.map((stage, idx) => (
-                                                            <option key={idx} value={idx + 1}>
+                                                        {(selectedPart.stage_inventory || []).map((stage) => (
+                                                            <option key={stage.stage_id} value={stage.stage_id}>
                                                                 {stage.stage_name}
                                                             </option>
                                                         ))}
@@ -510,7 +583,7 @@
                                                         required
                                                     >
                                                         <option value="">Select bin</option>
-                                                        {dashboardData.bins.map(bin => (
+                                                        {bins.map(bin => (
                                                             <option key={bin.id} value={bin.id}>
                                                                 {bin.bin_code} - {bin.bin_name}
                                                             </option>
@@ -566,7 +639,7 @@
                                     </div>
                                     
                                     <div className="stage-flow">
-                                        {selectedPart.stage_inventory.map((stage, idx) => (
+                                        {(selectedPart.stage_inventory || []).map((stage, idx) => (
                                             <div key={idx} className="stage-card">
                                                 <div className="stage-header">
                                                     <div className="stage-name">{stage.stage_name}</div>
@@ -576,19 +649,19 @@
                                                 <div className="stage-metrics">
                                                     <div className="metric total">
                                                         <div className="metric-label">Total</div>
-                                                        <div className="metric-value">{stage.quantity}</div>
+                                                        <div className="metric-value">{stage.quantity || 0}</div>
                                                     </div>
                                                     <div className="metric good">
                                                         <div className="metric-label">Good</div>
-                                                        <div className="metric-value">{stage.good_quantity}</div>
+                                                        <div className="metric-value">{stage.good_quantity || 0}</div>
                                                     </div>
                                                     <div className="metric rework">
                                                         <div className="metric-label">Rework</div>
-                                                        <div className="metric-value">{stage.rework_quantity}</div>
+                                                        <div className="metric-value">{stage.rework_quantity || 0}</div>
                                                     </div>
                                                     <div className="metric rejected">
                                                         <div className="metric-label">Rejected</div>
-                                                        <div className="metric-value">{stage.rejected_quantity}</div>
+                                                        <div className="metric-value">{stage.rejected_quantity || 0}</div>
                                                     </div>
                                                 </div>
                                                 
