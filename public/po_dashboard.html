@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Micron PO Tracking - Live Dashboard</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <title>PO Tracking - Micron</title>
+    <script src="/components/header.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -15,245 +13,249 @@
             min-height: 100vh;
             padding: 20px;
         }
-        .container { max-width: 1600px; margin: 0 auto; }
-        .header {
+        .container { max-width: 1400px; margin: 0 auto; }
+        .page-header {
             background: white;
             padding: 20px 30px;
             border-radius: 10px;
             margin-bottom: 20px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        .header h1 { color: #333; margin-bottom: 5px; }
-        .header p { color: #666; font-size: 14px; }
-        .po-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-            gap: 20px;
-            margin-bottom: 20px;
-        }
+        .page-header h1 { color: #333; margin-bottom: 5px; }
+        .page-header p { color: #666; font-size: 14px; }
         .po-card {
             background: white;
-            padding: 20px;
             border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        .po-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
         }
         .po-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 3px solid #e5e7eb;
+        }
+        .po-title { font-size: 24px; font-weight: 700; color: #333; }
+        .po-customer { font-size: 14px; color: #666; margin-top: 5px; }
+        .status-badge {
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-box {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #e5e7eb;
+        }
+        .stat-label { font-size: 12px; color: #666; margin-bottom: 5px; }
+        .stat-value { font-size: 24px; font-weight: bold; color: #333; }
+        .stat-box.remaining .stat-value { color: #667eea; }
+        .stat-box.allocated .stat-value { color: #f59e0b; }
+        .stat-box.produced .stat-value { color: #10b981; }
+        .stat-box.rejected .stat-value { color: #ef4444; }
+        .item-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #e5e7eb;
+        }
+        .item-section h3 { color: #333; margin-bottom: 15px; }
+        .item-card {
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
             margin-bottom: 15px;
         }
-        .po-number {
-            font-size: 20px;
-            font-weight: bold;
-            color: #333;
-        }
-        .status-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        .status-in_progress { background: #fef3c7; color: #92400e; }
-        .status-completed { background: #d1fae5; color: #065f46; }
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #e5e7eb;
-            border-radius: 4px;
-            overflow: hidden;
-            margin: 10px 0;
-        }
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #667eea, #764ba2);
-            transition: width 0.3s;
-        }
-        .stage-flow {
+        .item-header {
             display: flex;
-            flex-direction: column;
-            gap: 10px;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .part-name { font-size: 18px; font-weight: 600; color: #333; }
+        .bins-section {
             margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e5e7eb;
         }
-        .stage-item {
-            background: #f9fafb;
+        .bins-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .bin-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        .bin-tag {
+            background: white;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
             padding: 10px;
-            border-radius: 6px;
-            border-left: 4px solid #e5e7eb;
+            font-size: 12px;
         }
-        .stage-item.completed { border-color: #10b981; background: #ecfdf5; }
-        .stage-item.in_progress { border-color: #f59e0b; background: #fffbeb; }
-        .loading { text-align: center; padding: 40px; color: white; font-size: 18px; }
+        .bin-barcode {
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        .bin-info { color: #666; font-size: 11px; }
+        .bin-qty {
+            font-weight: 600;
+            color: #333;
+            margin-top: 5px;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
     </style>
 </head>
 <body>
-    <div id="root"></div>
-    
-    <script type="text/babel">
-        const { useState, useEffect } = React;
-        const API_BASE = '/api';
+    <div class="container">
+        <script>initNavigation('tracking');</script>
         
-        function PODashboard() {
-            const [loading, setLoading] = useState(true);
-            const [pos, setPOs] = useState([]);
-            const [selectedPO, setSelectedPO] = useState(null);
-            
-            useEffect(() => {
-                loadPOs();
-                const interval = setInterval(loadPOs, 10000);
-                return () => clearInterval(interval);
-            }, []);
-            
-            const loadPOs = async () => {
-                try {
-                    const response = await fetch(`${API_BASE}/po_tracking.php`);
-                    const data = await response.json();
-                    if (data.success) {
-                        setPOs(data.purchase_orders);
-                    }
-                    setLoading(false);
-                } catch (error) {
-                    console.error('Failed to load POs:', error);
-                    setLoading(false);
+        <div class="page-header">
+            <h1>📦 Purchase Order Tracking</h1>
+            <p>Monitor PO progress and bin assignments</p>
+        </div>
+        
+        <div id="poContainer">
+            <div class="empty-state">⏳ Loading purchase orders...</div>
+        </div>
+    </div>
+    
+    <script>
+        async function loadPOs() {
+            try {
+                const res = await fetch('/api/po_detail.php');
+                const data = await res.json();
+                
+                if (!data.success || !data.purchase_orders || data.purchase_orders.length === 0) {
+                    document.getElementById('poContainer').innerHTML = `
+                        <div class="empty-state">
+                            <h3>📋 No Purchase Orders Found</h3>
+                            <p>Create a PO in the admin panel to get started</p>
+                        </div>
+                    `;
+                    return;
                 }
-            };
-            
-            const loadPODetails = async (poNumber) => {
-                try {
-                    const response = await fetch(`${API_BASE}/po_tracking.php?po_number=${poNumber}`);
-                    const data = await response.json();
-                    if (data.success) {
-                        setSelectedPO(data.purchase_order);
-                    }
-                } catch (error) {
-                    console.error('Failed to load PO details:', error);
-                }
-            };
-            
-            if (loading) {
-                return <div className="loading">⏳ Loading purchase orders...</div>;
-            }
-            
-            return (
-                <div className="container">
-                    <div className="header">
-                        <h1>📋 Purchase Order Tracking</h1>
-                        <p>Real-time PTO manufacturing progress by PO</p>
-                    </div>
+                
+                const html = data.purchase_orders.map(po => {
+                    const remaining = po.total_ordered - po.total_allocated;
+                    const progress = po.total_ordered > 0 ? Math.round((po.total_produced / po.total_ordered) * 100) : 0;
                     
-                    <div className="po-grid">
-                        {pos.map(po => {
-                            const progress = po.total_ordered > 0 
-                                ? Math.round((po.total_produced / po.total_ordered) * 100) 
-                                : 0;
-                            
-                            return (
-                                <div 
-                                    key={po.id} 
-                                    className="po-card"
-                                    onClick={() => loadPODetails(po.po_number)}
-                                >
-                                    <div className="po-header">
-                                        <div className="po-number">{po.po_number}</div>
-                                        <span className={`status-badge status-${po.status}`}>
-                                            {po.status.replace('_', ' ').toUpperCase()}
-                                        </span>
-                                    </div>
-                                    
-                                    <div style={{color: '#666', marginBottom: '10px'}}>
-                                        <strong>{po.customer_name}</strong>
-                                    </div>
-                                    
-                                    <div style={{fontSize: '14px', color: '#666', marginBottom: '10px'}}>
-                                        {po.total_items} items · {po.total_ordered} units ordered
-                                    </div>
-                                    
-                                    <div className="progress-bar">
-                                        <div className="progress-fill" style={{width: `${progress}%`}}></div>
-                                    </div>
-                                    
-                                    <div style={{fontSize: '12px', color: '#666', marginTop: '5px'}}>
-                                        Progress: {progress}% ({po.total_produced}/{po.total_ordered})
-                                    </div>
-                                    
-                                    {po.total_rejected > 0 && (
-                                        <div style={{fontSize: '12px', color: '#ef4444', marginTop: '5px'}}>
-                                            ⚠️ {po.total_rejected} rejected
-                                        </div>
-                                    )}
+                    return `
+                        <div class="po-card">
+                            <div class="po-header">
+                                <div>
+                                    <div class="po-title">${po.po_number}</div>
+                                    <div class="po-customer">👤 ${po.customer_name}</div>
                                 </div>
-                            );
-                        })}
-                    </div>
-                    
-                    {selectedPO && (
-                        <div style={{background: 'white', padding: '30px', borderRadius: '10px', marginTop: '20px'}}>
-                            <h2 style={{marginBottom: '20px'}}>📦 {selectedPO.po_number} - Detailed View</h2>
+                                <span class="status-badge">${po.status}</span>
+                            </div>
                             
-                            {selectedPO.items && selectedPO.items.map(item => (
-                                <div key={item.id} style={{marginBottom: '30px', padding: '20px', background: '#f9fafb', borderRadius: '10px'}}>
-                                    <h3 style={{marginBottom: '15px'}}>{item.part_number} - {item.part_name}</h3>
-                                    
-                                    <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '20px'}}>
-                                        <div>
-                                            <div style={{fontSize: '12px', color: '#666'}}>Ordered</div>
-                                            <div style={{fontSize: '24px', fontWeight: 'bold'}}>{item.ordered_quantity}</div>
-                                        </div>
-                                        <div>
-                                            <div style={{fontSize: '12px', color: '#666'}}>Produced</div>
-                                            <div style={{fontSize: '24px', fontWeight: 'bold', color: '#10b981'}}>{item.produced_quantity}</div>
-                                        </div>
-                                        <div>
-                                            <div style={{fontSize: '12px', color: '#666'}}>Rejected</div>
-                                            <div style={{fontSize: '24px', fontWeight: 'bold', color: '#ef4444'}}>{item.rejected_quantity}</div>
-                                        </div>
-                                        <div>
-                                            <div style={{fontSize: '12px', color: '#666'}}>Rework</div>
-                                            <div style={{fontSize: '24px', fontWeight: 'bold', color: '#f59e0b'}}>{item.rework_quantity}</div>
-                                        </div>
-                                    </div>
-                                    
-                                    {item.current_bin && (
-                                        <div style={{padding: '10px', background: '#dbeafe', borderRadius: '6px', marginBottom: '15px'}}>
-                                            <strong>📍 Current Location:</strong> {item.current_bin.bin_barcode} - {item.current_bin.bin_name} ({item.current_bin.quantity} units)
-                                        </div>
-                                    )}
-                                    
-                                    <h4 style={{marginBottom: '10px'}}>Stage Progress:</h4>
-                                    <div className="stage-flow">
-                                        {item.stage_progress && item.stage_progress.map((stage, idx) => (
-                                            <div key={idx} className={`stage-item ${stage.stage_status}`}>
-                                                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                                                    <div>
-                                                        <strong>{stage.stage_name}</strong>
-                                                        <span style={{marginLeft: '10px', fontSize: '12px', color: '#666'}}>
-                                                            {stage.stage_status === 'completed' ? '✓ Completed' : 
-                                                             stage.stage_status === 'in_progress' ? '⏳ In Progress' : '⏸ Not Started'}
-                                                        </span>
-                                                    </div>
-                                                    <div style={{fontSize: '14px'}}>
-                                                        {stage.output_qty > 0 && `Output: ${stage.output_qty}`}
-                                                        {stage.rejected_qty > 0 && ` | Rejected: ${stage.rejected_qty}`}
+                            <div class="stats-row">
+                                <div class="stat-box">
+                                    <div class="stat-label">Ordered</div>
+                                    <div class="stat-value">${po.total_ordered || 0}</div>
+                                </div>
+                                <div class="stat-box remaining">
+                                    <div class="stat-label">In Queue</div>
+                                    <div class="stat-value">${remaining}</div>
+                                </div>
+                                <div class="stat-box allocated">
+                                    <div class="stat-label">Allocated to Bins</div>
+                                    <div class="stat-value">${po.total_allocated || 0}</div>
+                                </div>
+                                <div class="stat-box produced">
+                                    <div class="stat-label">Produced</div>
+                                    <div class="stat-value">${po.total_produced || 0}</div>
+                                </div>
+                                <div class="stat-box rejected">
+                                    <div class="stat-label">Rejected</div>
+                                    <div class="stat-value">${po.total_rejected || 0}</div>
+                                </div>
+                                <div class="stat-box">
+                                    <div class="stat-label">Progress</div>
+                                    <div class="stat-value">${progress}%</div>
+                                </div>
+                            </div>
+                            
+                            <div class="item-section">
+                                <h3>📦 Items & Bin Assignments</h3>
+                                ${po.items && po.items.length > 0 ? po.items.map(item => {
+                                    const itemRemaining = item.ordered_quantity - item.allocated_quantity;
+                                    return `
+                                        <div class="item-card">
+                                            <div class="item-header">
+                                                <span class="part-name">${item.part_number}</span>
+                                                <span style="font-size: 14px; color: #666;">
+                                                    ${item.ordered_quantity} ordered | 
+                                                    <span style="color: #f59e0b;">${item.allocated_quantity} in bins</span> | 
+                                                    <span style="color: #667eea;">${itemRemaining} in queue</span>
+                                                </span>
+                                            </div>
+                                            
+                                            ${item.bins && item.bins.length > 0 ? `
+                                                <div class="bins-section">
+                                                    <div class="bins-title">🗄️ Assigned Bins (${item.bins.length})</div>
+                                                    <div class="bin-grid">
+                                                        ${item.bins.map(bin => `
+                                                            <div class="bin-tag">
+                                                                <div class="bin-barcode">${bin.bin_barcode}</div>
+                                                                <div class="bin-info">📍 ${bin.location}</div>
+                                                                <div class="bin-info">🏷️ ${bin.stage_name}</div>
+                                                                <div class="bin-qty">${bin.quantity} units</div>
+                                                            </div>
+                                                        `).join('')}
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
+                                            ` : `
+                                                <div style="text-align: center; padding: 20px; color: #999;">
+                                                    ⚠️ No bins allocated yet. Go to Allocate page to assign material to bins.
+                                                </div>
+                                            `}
+                                        </div>
+                                    `;
+                                }).join('') : '<p style="color: #999; padding: 20px;">No items in this PO</p>'}
+                            </div>
                         </div>
-                    )}
-                </div>
-            );
+                    `;
+                }).join('');
+                
+                document.getElementById('poContainer').innerHTML = html;
+                
+            } catch (error) {
+                console.error('Failed to load POs:', error);
+                document.getElementById('poContainer').innerHTML = `
+                    <div class="empty-state">
+                        <h3>❌ Error Loading Data</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
         }
         
-        ReactDOM.render(<PODashboard />, document.getElementById('root'));
+        loadPOs();
+        setInterval(loadPOs, 30000); // Refresh every 30 seconds
     </script>
 </body>
 </html>
