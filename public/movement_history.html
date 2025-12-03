@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movement History - Complete Audit Trail</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1600px; margin: 0 auto; }
+        .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header h1 { color: #333; font-size: 24px; margin-bottom: 5px; }
+        .header p { color: #666; font-size: 14px; }
+        
+        .filters {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            align-items: end;
+        }
+        .filter-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+        }
+        .filter-group select, .filter-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5568d3; }
+        
+        .timeline-container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .timeline {
+            position: relative;
+            padding-left: 40px;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: linear-gradient(180deg, #667eea, #764ba2);
+        }
+        
+        .movement-item {
+            position: relative;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f9fafb;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s;
+        }
+        .movement-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .movement-item::before {
+            content: '';
+            position: absolute;
+            left: -37px;
+            top: 25px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: white;
+            border: 4px solid #667eea;
+            z-index: 2;
+        }
+        
+        .movement-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .movement-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+        .movement-time {
+            font-size: 13px;
+            color: #666;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .movement-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .detail-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        .detail-value {
+            font-size: 14px;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .stage-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .bin-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #f3f4f6;
+            color: #374151;
+            border: 1px solid #d1d5db;
+        }
+        
+        .quantity-box {
+            display: inline-block;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .quantity-box.good { background: #d1fae5; color: #065f46; }
+        .quantity-box.reject { background: #fee; color: #991b1b; }
+        .quantity-box.rework { background: #fef3c7; color: #92400e; }
+        
+        .transfer-arrow {
+            font-size: 24px;
+            color: #667eea;
+            margin: 0 10px;
+        }
+        
+        .operator-info {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        .empty-state h3 { font-size: 18px; margin-bottom: 10px; color: #666; }
+        
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-label { font-size: 12px; color: #666; margin-bottom: 5px; }
+        .stat-value { font-size: 24px; font-weight: bold; color: #333; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Movement History & Audit Trail</h1>
+            <p>Track every material transfer across all stages and bins</p>
+        </div>
+        
+        <div class="filters">
+            <div class="filter-group">
+                <label>Purchase Order</label>
+                <select id="poFilter">
+                    <option value="">All POs</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Part Number</label>
+                <select id="partFilter">
+                    <option value="">All Parts</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Stage</label>
+                <select id="stageFilter">
+                    <option value="">All Stages</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Date From</label>
+                <input type="date" id="dateFrom">
+            </div>
+            <div class="filter-group">
+                <label>Date To</label>
+                <input type="date" id="dateTo">
+            </div>
+            <div class="filter-group" style="display: flex; align-items: end;">
+                <button class="btn btn-primary" onclick="applyFilters()" style="width: 100%;">🔍 Filter</button>
+            </div>
+        </div>
+        
+        <div class="stats-bar" id="statsBar">
+            <div class="stat-card">
+                <div class="stat-label">Total Movements</div>
+                <div class="stat-value" id="totalMovements">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Transferred</div>
+                <div class="stat-value" id="totalQuantity" style="color: #10b981;">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Rejected</div>
+                <div class="stat-value" id="totalRejected" style="color: #ef4444;">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Rework</div>
+                <div class="stat-value" id="totalRework" style="color: #f59e0b;">-</div>
+            </div>
+        </div>
+        
+        <div class="timeline-container">
+            <div class="timeline" id="timeline">
+                <div class="empty-state">
+                    <h3>⏳ Loading movement history...</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = '/api';
+        let allMovements = [];
+        let allPOs = [];
+        let allParts = [];
+        
+        function formatDateTime(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            
+            let relative = '';
+            if (diffDays > 0) relative = `${diffDays}d ago`;
+            else if (diffHours > 0) relative = `${diffHours}h ago`;
+            else if (diffMins > 0) relative = `${diffMins}m ago`;
+            else relative = 'Just now';
+            
+            return `${date.toLocaleString()} (${relative})`;
+        }
+        
+        async function loadData() {
+            try {
+                // Load movements
+                const movRes = await fetch(`${API_BASE}/movements.php`);
+                const movData = await movRes.json();
+                allMovements = movData.movements || [];
+                
+                // Load POs for filter
+                const poRes = await fetch(`${API_BASE}/dashboard.php`);
+                const poData = await poRes.json();
+                allPOs = poData.purchase_orders || [];
+                
+                // Load parts for filter
+                const partRes = await fetch(`${API_BASE}/parts.php`);
+                const partData = await partRes.json();
+                allParts = partData.parts || [];
+                
+                populateFilters();
+                renderMovements(allMovements);
+            } catch (error) {
+                console.error('Failed to load data:', error);
+                document.getElementById('timeline').innerHTML = `
+                    <div class="empty-state">
+                        <h3>❌ Error loading movement history</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function populateFilters() {
+            // Populate PO filter
+            const poFilter = document.getElementById('poFilter');
+            poFilter.innerHTML = '<option value="">All POs</option>' + 
+                allPOs.map(po => `<option value="${po.po_number}">${po.po_number} - ${po.customer_name}</option>`).join('');
+            
+            // Populate Part filter
+            const partFilter = document.getElementById('partFilter');
+            partFilter.innerHTML = '<option value="">All Parts</option>' + 
+                allParts.map(p => `<option value="${p.part_number}">${p.part_number}</option>`).join('');
+            
+            // Populate Stage filter
+            const stages = [...new Set(allMovements.map(m => m.to_stage).filter(s => s))];
+            const stageFilter = document.getElementById('stageFilter');
+            stageFilter.innerHTML = '<option value="">All Stages</option>' + 
+                stages.map(s => `<option value="${s}">${s}</option>`).join('');
+        }
+        
+        function applyFilters() {
+            const poFilter = document.getElementById('poFilter').value;
+            const partFilter = document.getElementById('partFilter').value;
+            const stageFilter = document.getElementById('stageFilter').value;
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+            
+            let filtered = allMovements.filter(m => {
+                if (poFilter && m.po_number !== poFilter) return false;
+                if (partFilter && m.part_number !== partFilter) return false;
+                if (stageFilter && m.to_stage !== stageFilter) return false;
+                if (dateFrom && new Date(m.movement_timestamp) < new Date(dateFrom)) return false;
+                if (dateTo && new Date(m.movement_timestamp) > new Date(dateTo + 'T23:59:59')) return false;
+                return true;
+            });
+            
+            renderMovements(filtered);
+        }
+        
+        function renderMovements(movements) {
+            const timeline = document.getElementById('timeline');
+            
+            if (movements.length === 0) {
+                timeline.innerHTML = `
+                    <div class="empty-state">
+                        <h3>📭 No movements found</h3>
+                        <p>Try adjusting your filters or create some transfers first</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Calculate stats
+            const totalQty = movements.reduce((sum, m) => sum + (m.quantity_moved || 0), 0);
+            const totalRej = movements.reduce((sum, m) => sum + (m.rejected_count || 0), 0);
+            const totalRew = movements.reduce((sum, m) => sum + (m.rework_count || 0), 0);
+            
+            document.getElementById('totalMovements').textContent = movements.length;
+            document.getElementById('totalQuantity').textContent = totalQty;
+            document.getElementById('totalRejected').textContent = totalRej;
+            document.getElementById('totalRework').textContent = totalRew;
+            
+            // Render timeline
+            timeline.innerHTML = movements.map(m => `
+                <div class="movement-item">
+                    <div class="movement-header">
+                        <div class="movement-title">
+                            ${m.po_number} | ${m.part_number}
+                        </div>
+                        <div class="movement-time">
+                            ⏰ ${formatDateTime(m.movement_timestamp)}
+                        </div>
+                    </div>
+                    
+                    <div class="movement-details">
+                        <div class="detail-item">
+                            <div class="detail-label">Transfer Route</div>
+                            <div class="detail-value">
+                                <span class="stage-badge">${m.from_stage || 'Start'}</span>
+                                <span class="transfer-arrow">→</span>
+                                <span class="stage-badge">${m.to_stage}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div class="detail-label">Bin Transfer</div>
+                            <div class="detail-value">
+                                <span class="bin-badge">${m.from_bin || 'N/A'}</span>
+                                <span class="transfer-arrow">→</span>
+                                <span class="bin-badge">${m.to_bin}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div class="detail-label">Quantities</div>
+                            <div class="detail-value">
+                                <span class="quantity-box good">✓ ${m.quantity_moved}</span>
+                                ${m.rejected_count > 0 ? `<span class="quantity-box reject">✗ ${m.rejected_count}</span>` : ''}
+                                ${m.rework_count > 0 ? `<span class="quantity-box rework">⟲ ${m.rework_count}</span>` : ''}
+                            </div>
+                        </div>
+                        
+                        <div class="detail-item">
+                            <div class="detail-label">Transfer Type</div>
+                            <div class="detail-value">
+                                <span class="stage-badge">${m.transfer_type || 'stage_transfer'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${m.scanned_by || m.notes ? `
+                        <div class="operator-info">
+                            ${m.scanned_by ? `👤 Operator: <strong>${m.scanned_by}</strong>` : ''}
+                            ${m.notes ? ` | 📝 Notes: ${m.notes}` : ''}
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+        
+        // Set default date range (last 7 days)
+        const today = new Date();
+        const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+        document.getElementById('dateTo').valueAsDate = today;
+        document.getElementById('dateFrom').valueAsDate = weekAgo;
+        
+        // Initialize
+        loadData();
+        setInterval(loadData, 30000); // Refresh every 30 seconds
+    </script>
+</body>
+</html>
