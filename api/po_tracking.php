@@ -38,34 +38,10 @@ switch ($method) {
                 $stmt->execute([$po['id']]);
                 $items = $stmt->fetchAll();
                 
-                // Get stage-wise progress for each item
+                // Get current bin location for each item
                 foreach ($items as &$item) {
                     $stmt = $conn->prepare("
-                        SELECT 
-                            s.stage_name,
-                            s.stage_order,
-                            COALESCE(SUM(so.input_quantity), 0) as input_qty,
-                            COALESCE(SUM(so.output_quantity), 0) as output_qty,
-                            COALESCE(SUM(so.rejected_quantity), 0) as rejected_qty,
-                            COALESCE(SUM(so.rework_quantity), 0) as rework_qty,
-                            MAX(so.completed_at) as completed_at,
-                            CASE 
-                                WHEN COUNT(CASE WHEN so.status = 'completed' THEN 1 END) > 0 THEN 'completed'
-                                WHEN COUNT(CASE WHEN so.status = 'in_progress' THEN 1 END) > 0 THEN 'in_progress'
-                                ELSE 'not_started'
-                            END as stage_status
-                        FROM stages s
-                        LEFT JOIN stage_operations so ON s.id = so.stage_id AND so.po_item_id = ?
-                        WHERE s.part_id = ?
-                        GROUP BY s.id
-                        ORDER BY s.stage_order
-                    ");
-                    $stmt->execute([$item['id'], $item['part_id']]);
-                    $item['stage_progress'] = $stmt->fetchAll();
-                    
-                    // Get current bin location
-                    $stmt = $conn->prepare("
-                        SELECT b.bin_barcode, b.bin_name, b.location, bi.quantity
+                        SELECT b.bin_barcode, b.bin_name, b.location, b.zone, bi.quantity
                         FROM bin_inventory bi
                         JOIN bins b ON bi.bin_id = b.id
                         WHERE bi.po_item_id = ? AND bi.quantity > 0
@@ -74,26 +50,6 @@ switch ($method) {
                     ");
                     $stmt->execute([$item['id']]);
                     $item['current_bin'] = $stmt->fetch();
-                    
-                    // Get recent transfers
-                    $stmt = $conn->prepare("
-                        SELECT 
-                            bt.*,
-                            b1.bin_barcode as from_barcode,
-                            b2.bin_barcode as to_barcode,
-                            s1.stage_name as from_stage,
-                            s2.stage_name as to_stage
-                        FROM bin_transfers bt
-                        LEFT JOIN bins b1 ON bt.from_bin_id = b1.id
-                        JOIN bins b2 ON bt.to_bin_id = b2.id
-                        LEFT JOIN stages s1 ON bt.from_stage_id = s1.id
-                        JOIN stages s2 ON bt.to_stage_id = s2.id
-                        WHERE bt.po_item_id = ?
-                        ORDER BY bt.created_at DESC
-                        LIMIT 10
-                    ");
-                    $stmt->execute([$item['id']]);
-                    $item['recent_transfers'] = $stmt->fetchAll();
                 }
                 
                 $po['items'] = $items;
@@ -131,11 +87,11 @@ switch ($method) {
         break;
         
     case 'POST':
-        // Create new PO
+        // Create new PO with automatic bin assignment
         $data = json_decode(file_get_contents('php://input'), true);
         
         if (!isset($data['po_number']) || !isset($data['items'])) {
-            sendError('Missing required fields: po_number, items');
+            sendError('Missing required fields: po_number, items', 400);
         }
         
         try {
@@ -157,9 +113,19 @@ switch ($method) {
             
             $po_id = $conn->lastInsertId();
             
-            // Add items
+            // Get next available incoming bin
+            $stmt = $conn->query("
+                SELECT id, bin_barcode FROM bins 
+                WHERE zone = 'INCOMING' AND status = 'active'
+                ORDER BY bin_barcode
+                LIMIT 100
+            ");
+            $available_bins = $stmt->fetchAll();
+            $bin_index = 0;
+            
+            // Add items with automatic bin assignment
             foreach ($data['items'] as $item) {
-                // Get first stage for this part
+                // Get first stage for this part (Incoming)
                 $stmt = $conn->prepare("
                     SELECT id FROM stages 
                     WHERE part_id = ? 
@@ -169,16 +135,70 @@ switch ($method) {
                 $stmt->execute([$item['part_id']]);
                 $first_stage = $stmt->fetch();
                 
+                if (!$first_stage) {
+                    throw new Exception('No stages found for part_id: ' . $item['part_id']);
+                }
+                
+                // Create PO item
                 $stmt = $conn->prepare("
                     INSERT INTO po_items
-                    (po_id, part_id, ordered_quantity, current_stage_id)
-                    VALUES (?, ?, ?, ?)
+                    (po_id, part_id, ordered_quantity, current_stage_id, status)
+                    VALUES (?, ?, ?, ?, 'in_progress')
                 ");
                 $stmt->execute([
                     $po_id,
                     $item['part_id'],
                     $item['quantity'],
-                    $first_stage['id'] ?? null
+                    $first_stage['id']
+                ]);
+                
+                $po_item_id = $conn->lastInsertId();
+                
+                // Assign to incoming bin (use provided bin or auto-assign)
+                $assigned_bin_id = null;
+                
+                if (isset($item['bin_id']) && !empty($item['bin_id'])) {
+                    // Use specified bin
+                    $assigned_bin_id = $item['bin_id'];
+                } else {
+                    // Auto-assign from available incoming bins
+                    if ($bin_index < count($available_bins)) {
+                        $assigned_bin_id = $available_bins[$bin_index]['id'];
+                        $bin_index++;
+                    } else {
+                        // Fallback to first incoming bin if we run out
+                        $assigned_bin_id = $available_bins[0]['id'];
+                    }
+                }
+                
+                // Create bin inventory record
+                $stmt = $conn->prepare("
+                    INSERT INTO bin_inventory
+                    (bin_id, po_item_id, stage_id, quantity, good_quantity)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                    quantity = quantity + VALUES(quantity),
+                    good_quantity = good_quantity + VALUES(good_quantity)
+                ");
+                $stmt->execute([
+                    $assigned_bin_id,
+                    $po_item_id,
+                    $first_stage['id'],
+                    $item['quantity'],
+                    $item['quantity']
+                ]);
+                
+                // Record initial movement (material received)
+                $stmt = $conn->prepare("
+                    INSERT INTO movements
+                    (po_item_id, to_bin_id, to_stage_id, quantity_moved, transfer_type, notes)
+                    VALUES (?, ?, ?, ?, 'incoming', 'Initial material receipt')
+                ");
+                $stmt->execute([
+                    $po_item_id,
+                    $assigned_bin_id,
+                    $first_stage['id'],
+                    $item['quantity']
                 ]);
             }
             
@@ -186,8 +206,9 @@ switch ($method) {
             
             sendJSON([
                 'success' => true,
-                'message' => 'Purchase order created successfully',
-                'po_id' => $po_id
+                'message' => 'Purchase order created successfully with bin assignments',
+                'po_id' => $po_id,
+                'po_number' => $data['po_number']
             ], 201);
             
         } catch (Exception $e) {

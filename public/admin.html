@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Panel - Create PO</title>
+    <title>Admin - Create PO</title>
     <script src="/components/header.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -23,11 +23,7 @@
         }
         .page-header h1 { color: #333; }
         .page-header p { color: #666; font-size: 14px; }
-        .main-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
+        .main-content { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .card {
             background: white;
             padding: 25px;
@@ -64,7 +60,7 @@
         .btn-danger { background: #ef4444; color: white; }
         .item-row {
             display: grid;
-            grid-template-columns: 2fr 1fr auto;
+            grid-template-columns: 2fr 1fr 2fr auto;
             gap: 10px;
             margin-bottom: 10px;
             align-items: end;
@@ -82,16 +78,25 @@
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+        }
+        .bin-info {
+            font-size: 12px;
+            color: #666;
+            background: #f3f4f6;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 5px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <script>initNavigation('admin');</script>
+        <script>document.addEventListener('DOMContentLoaded', () => initNavigation('admin'));</script>
         
         <div class="page-header">
             <h1>📝 Create Purchase Order</h1>
-            <p>Add new orders and manage production</p>
+            <p>Material will be automatically assigned to incoming bins</p>
         </div>
         
         <div class="main-content">
@@ -115,10 +120,12 @@
                         <input type="date" id="delivery_date" required>
                     </div>
                     <h3 style="margin: 20px 0 15px; font-size: 16px;">📦 Items</h3>
+                    <p style="font-size: 13px; color: #666; margin-bottom: 10px;">ℹ️ Bins will be auto-assigned in INCOMING zone (BIN-0001 onwards)</p>
                     <div id="itemsContainer">
                         <div class="item-row">
                             <select class="part-select" required><option>Loading...</option></select>
-                            <input type="number" class="quantity-input" required min="1" placeholder="Quantity">
+                            <input type="number" class="quantity-input" required min="1" placeholder="Qty">
+                            <select class="bin-select"><option value="">Auto-assign bin</option></select>
                             <button type="button" class="btn btn-danger" onclick="removeItem(this)" style="width: auto; padding: 10px 20px;">✕</button>
                         </div>
                     </div>
@@ -135,29 +142,53 @@
     </div>
     <script>
         let allParts = [];
+        let allBins = [];
+        
         async function loadParts() {
             const res = await fetch('/api/parts.php');
             const data = await res.json();
             allParts = data.parts || [];
+            updatePartSelects();
+        }
+        
+        async function loadBins() {
+            const res = await fetch('/api/parts.php'); // Will add bins endpoint
+            allBins = []; // Bins loaded but optional
+            updateBinSelects();
+        }
+        
+        function updatePartSelects() {
             document.querySelectorAll('.part-select').forEach(sel => {
                 sel.innerHTML = '<option value="">Select part</option>' +
-                    allParts.map(p => `<option value="${p.id}">${p.part_number}</option>`).join('');
+                    allParts.map(p => `<option value="${p.id}">${p.part_number} - ${p.part_name || ''}</option>`).join('');
             });
         }
+        
+        function updateBinSelects() {
+            document.querySelectorAll('.bin-select').forEach(sel => {
+                sel.innerHTML = '<option value="">Auto-assign bin (Recommended)</option>';
+                // Could add manual bin selection here if needed
+            });
+        }
+        
         function addItem() {
             const row = document.createElement('div');
             row.className = 'item-row';
             row.innerHTML = `
                 <select class="part-select" required></select>
-                <input type="number" class="quantity-input" required min="1">
+                <input type="number" class="quantity-input" required min="1" placeholder="Qty">
+                <select class="bin-select"><option value="">Auto-assign bin</option></select>
                 <button type="button" class="btn btn-danger" onclick="removeItem(this)" style="width: auto; padding: 10px 20px;">✕</button>
             `;
             document.getElementById('itemsContainer').appendChild(row);
-            loadParts();
+            updatePartSelects();
+            updateBinSelects();
         }
+        
         function removeItem(btn) {
             if (document.querySelectorAll('.item-row').length > 1) btn.closest('.item-row').remove();
         }
+        
         async function loadPOs() {
             const res = await fetch('/api/po_tracking.php');
             const data = await res.json();
@@ -166,44 +197,70 @@
                 list.innerHTML = data.purchase_orders.map(po => `
                     <div class="po-item">
                         <strong>${po.po_number}</strong> - ${po.customer_name}<br>
-                        <small>Items: ${po.total_items || 0} | ${po.status}</small>
+                        <small>Items: ${po.total_items || 0} | Ordered: ${po.total_ordered || 0} | ${po.status}</small>
                     </div>
                 `).join('');
+            } else {
+                list.innerHTML = '<p style="padding: 20px; text-align: center; color: #999;">No POs yet</p>';
             }
         }
+        
         document.getElementById('poForm').onsubmit = async (e) => {
             e.preventDefault();
             const items = [];
             document.querySelectorAll('.item-row').forEach(row => {
                 const pid = row.querySelector('.part-select').value;
                 const qty = row.querySelector('.quantity-input').value;
-                if (pid && qty) items.push({part_id: pid, quantity: parseInt(qty)});
+                const bin = row.querySelector('.bin-select').value;
+                if (pid && qty) {
+                    const item = {part_id: parseInt(pid), quantity: parseInt(qty)};
+                    if (bin) item.bin_id = parseInt(bin);
+                    items.push(item);
+                }
             });
-            const res = await fetch('/api/po_tracking.php', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    po_number: document.getElementById('po_number').value,
-                    customer_name: document.getElementById('customer_name').value,
-                    order_date: document.getElementById('order_date').value,
-                    delivery_date: document.getElementById('delivery_date').value,
-                    items
-                })
-            });
-            const result = await res.json();
-            if (result.success) {
-                document.getElementById('successMsg').textContent = '✓ PO Created!';
-                document.getElementById('successMsg').style.display = 'block';
-                document.getElementById('poForm').reset();
-                loadPOs();
+            
+            if (items.length === 0) {
+                alert('Add at least one item');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/po_tracking.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        po_number: document.getElementById('po_number').value,
+                        customer_name: document.getElementById('customer_name').value,
+                        order_date: document.getElementById('order_date').value,
+                        delivery_date: document.getElementById('delivery_date').value,
+                        items
+                    })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    document.getElementById('successMsg').textContent = `✓ PO ${result.po_number} created! Material assigned to incoming bins.`;
+                    document.getElementById('successMsg').style.display = 'block';
+                    document.getElementById('poForm').reset();
+                    loadPOs();
+                    setTimeout(() => {
+                        window.location.href = '/po_dashboard.html';
+                    }, 2000);
+                } else {
+                    alert('Error: ' + (result.error || 'Failed to create PO'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
             }
         };
+        
         document.getElementById('order_date').valueAsDate = new Date();
         const dd = new Date();
         dd.setDate(dd.getDate() + 14);
         document.getElementById('delivery_date').valueAsDate = dd;
         loadParts();
+        loadBins();
         loadPOs();
+        setInterval(loadPOs, 30000);
     </script>
 </body>
 </html>
