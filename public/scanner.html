@@ -3,46 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Micron Barcode Scanner - Production Tracking</title>
+    <title>Scanner - Micron Tracking</title>
+    <script src="/components/header.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
         }
-        
+        .container { max-width: 1000px; margin: 0 auto; }
         .scanner-container {
-            max-width: 800px;
-            margin: 0 auto;
             background: white;
             border-radius: 15px;
             padding: 30px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            margin-top: 20px;
         }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        
-        .header h1 {
-            color: #333;
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-        
-        .header p {
-            color: #666;
-            font-size: 14px;
-        }
-        
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { color: #333; font-size: 28px; margin-bottom: 10px; }
+        .header p { color: #666; font-size: 14px; }
         .scan-area {
             background: #f0f9ff;
             border: 3px dashed #3b82f6;
@@ -51,12 +32,7 @@
             text-align: center;
             margin-bottom: 30px;
         }
-        
-        .scan-icon {
-            font-size: 80px;
-            margin-bottom: 20px;
-        }
-        
+        .scan-icon { font-size: 80px; margin-bottom: 20px; }
         .barcode-input {
             width: 100%;
             padding: 15px 20px;
@@ -67,13 +43,11 @@
             font-weight: bold;
             letter-spacing: 2px;
         }
-        
         .barcode-input:focus {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
         }
-        
         .btn {
             padding: 12px 30px;
             border: none;
@@ -84,67 +58,25 @@
             transition: all 0.2s;
             margin: 5px;
         }
-        
-        .btn-primary {
-            background: #667eea;
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background: #5568d3;
-            transform: translateY(-2px);
-        }
-        
-        .btn-success {
-            background: #10b981;
-            color: white;
-        }
-        
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5568d3; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-success:hover { background: #059669; }
         .info-panel {
             background: #f9fafb;
             border-radius: 10px;
             padding: 20px;
             margin-top: 20px;
         }
-        
-        .info-panel h3 {
-            color: #333;
-            margin-bottom: 15px;
-        }
-        
+        .info-panel h3 { color: #333; margin-bottom: 15px; }
         .info-row {
             display: flex;
             justify-content: space-between;
             padding: 10px 0;
             border-bottom: 1px solid #e5e7eb;
         }
-        
-        .info-row:last-child {
-            border-bottom: none;
-        }
-        
-        .info-label {
-            color: #666;
-            font-weight: 600;
-        }
-        
-        .info-value {
-            color: #333;
-            font-weight: bold;
-        }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        
-        .status-success { background: #d1fae5; color: #065f46; }
-        .status-warning { background: #fef3c7; color: #92400e; }
-        .status-danger { background: #fee2e2; color: #991b1b; }
-        
+        .info-label { color: #666; font-weight: 600; }
+        .info-value { color: #333; font-weight: bold; }
         .transfer-form {
             background: #fff;
             padding: 20px;
@@ -152,109 +84,102 @@
             margin-top: 20px;
             border: 2px solid #e5e7eb;
         }
-        
-        .form-group {
-            margin-bottom: 15px;
-        }
-        
+        .form-group { margin-bottom: 15px; }
         .form-group label {
             display: block;
             margin-bottom: 5px;
             color: #374151;
             font-weight: 600;
         }
-        
-        .form-group input, .form-group select {
+        .form-group input {
             width: 100%;
             padding: 10px;
-            border: 1px solid #d1d5db;
+            border: 2px solid #d1d5db;
             border-radius: 6px;
             font-size: 14px;
         }
-        
         .alert {
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 20px;
         }
-        
         .alert-success { background: #d1fae5; color: #065f46; border: 2px solid #10b981; }
         .alert-error { background: #fee2e2; color: #991b1b; border: 2px solid #ef4444; }
     </style>
 </head>
 <body>
-    <div class="scanner-container">
-        <div class="header">
-            <h1>📦 Micron Barcode Scanner</h1>
-            <p>Scan bins to track material movement</p>
-        </div>
+    <div class="container">
+        <script>initNavigation('scanner');</script>
         
-        <div class="scan-area">
-            <div class="scan-icon">🔍</div>
-            <input 
-                type="text" 
-                id="barcodeInput" 
-                class="barcode-input" 
-                placeholder="SCAN OR TYPE BARCODE" 
-                autofocus
-            />
-            <div style="margin-top: 20px;">
-                <button class="btn btn-primary" onclick="scanBarcode()">Scan Bin</button>
-                <button class="btn btn-success" onclick="showTransferForm()">Transfer Material</button>
+        <div class="scanner-container">
+            <div class="header">
+                <h1>📦 Barcode Scanner</h1>
+                <p>Scan bins to track material movement</p>
             </div>
-        </div>
-        
-        <div id="alertArea"></div>
-        
-        <div id="binInfo" style="display: none;" class="info-panel">
-            <h3>🗄️ Bin Information</h3>
-            <div id="binDetails"></div>
-        </div>
-        
-        <div id="transferForm" style="display: none;" class="transfer-form">
-            <h3>Transfer Material</h3>
-            <div class="form-group">
-                <label>From Bin (Source)</label>
-                <input type="text" id="fromBin" placeholder="Scan or enter source bin barcode" />
+            
+            <div class="scan-area">
+                <div class="scan-icon">🔍</div>
+                <input 
+                    type="text" 
+                    id="barcodeInput" 
+                    class="barcode-input" 
+                    placeholder="SCAN OR TYPE BARCODE" 
+                    autofocus
+                />
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-primary" onclick="scanBarcode()">Scan Bin</button>
+                    <button class="btn btn-success" onclick="showTransferForm()">Transfer Material</button>
+                </div>
             </div>
-            <div class="form-group">
-                <label>To Bin (Destination)</label>
-                <input type="text" id="toBin" placeholder="Scan or enter destination bin barcode" />
+            
+            <div id="alertArea"></div>
+            
+            <div id="binInfo" style="display: none;" class="info-panel">
+                <h3>🗄️ Bin Information</h3>
+                <div id="binDetails"></div>
             </div>
-            <div class="form-group">
-                <label>PO Item ID</label>
-                <input type="number" id="poItemId" placeholder="Enter PO item ID" />
+            
+            <div id="transferForm" style="display: none;" class="transfer-form">
+                <h3>Transfer Material</h3>
+                <div class="form-group">
+                    <label>From Bin (Source)</label>
+                    <input type="text" id="fromBin" placeholder="Scan source bin barcode" />
+                </div>
+                <div class="form-group">
+                    <label>To Bin (Destination)</label>
+                    <input type="text" id="toBin" placeholder="Scan destination bin barcode" />
+                </div>
+                <div class="form-group">
+                    <label>PO Item ID</label>
+                    <input type="number" id="poItemId" placeholder="Enter PO item ID" />
+                </div>
+                <div class="form-group">
+                    <label>Rejected Quantity</label>
+                    <input type="number" id="rejectedQty" value="0" min="0" />
+                </div>
+                <div class="form-group">
+                    <label>Rework Quantity</label>
+                    <input type="number" id="reworkQty" value="0" min="0" />
+                </div>
+                <div class="form-group">
+                    <label>Scanned By</label>
+                    <input type="text" id="scannedBy" value="Operator" />
+                </div>
+                <button class="btn btn-success" onclick="executeTransfer()">Execute Transfer</button>
+                <button class="btn btn-primary" onclick="hideTransferForm()">Cancel</button>
             </div>
-            <div class="form-group">
-                <label>Rejected Quantity</label>
-                <input type="number" id="rejectedQty" value="0" min="0" />
-            </div>
-            <div class="form-group">
-                <label>Rework Quantity</label>
-                <input type="number" id="reworkQty" value="0" min="0" />
-            </div>
-            <div class="form-group">
-                <label>Scanned By</label>
-                <input type="text" id="scannedBy" value="Operator" />
-            </div>
-            <button class="btn btn-success" onclick="executeTransfer()">Execute Transfer</button>
-            <button class="btn btn-primary" onclick="hideTransferForm()">Cancel</button>
         </div>
     </div>
     
     <script>
         const API_BASE = '/api';
         
-        // Auto-submit on Enter
         document.getElementById('barcodeInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                scanBarcode();
-            }
+            if (e.key === 'Enter') scanBarcode();
         });
         
         async function scanBarcode() {
             const barcode = document.getElementById('barcodeInput').value.trim();
-            
             if (!barcode) {
                 showAlert('Please enter a barcode', 'error');
                 return;
@@ -291,53 +216,30 @@
                     <span class="info-value">${bin.bin_barcode}</span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label">Bin Name:</span>
-                    <span class="info-value">${bin.bin_name}</span>
-                </div>
-                <div class="info-row">
                     <span class="info-label">Location:</span>
-                    <span class="info-value">${bin.location}</span>
+                    <span class="info-value">${bin.location} (${bin.zone})</span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label">Zone:</span>
-                    <span class="info-value">${bin.zone}</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Status:</span>
-                    <span class="status-badge status-success">${bin.status.toUpperCase()}</span>
+                    <span class="info-label">Capacity:</span>
+                    <span class="info-value">${bin.capacity} units</span>
                 </div>
             `;
             
             if (contents && contents.length > 0) {
-                html += '<h4 style="margin-top: 20px; color: #333;">📦 Current Contents:</h4>';
+                html += '<h4 style="margin-top: 20px; color: #333;">📦 Contents:</h4>';
                 contents.forEach(item => {
                     html += `
-                        <div style="background: white; padding: 15px; border-radius: 8px; margin-top: 10px; border: 1px solid #e5e7eb;">
-                            <div class="info-row">
-                                <span class="info-label">PO Number:</span>
-                                <span class="info-value">${item.po_number}</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="info-label">Part:</span>
-                                <span class="info-value">${item.part_number}</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="info-label">Stage:</span>
-                                <span class="info-value">${item.stage_name}</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="info-label">Quantity:</span>
-                                <span class="info-value">${item.quantity} units</span>
-                            </div>
-                            <div class="info-row">
-                                <span class="info-label">PO Item ID:</span>
-                                <span class="info-value">${item.po_item_id}</span>
-                            </div>
+                        <div style="background: white; padding: 15px; border-radius: 8px; margin-top: 10px; border: 2px solid #e5e7eb;">
+                            <div class="info-row"><span class="info-label">PO:</span><span class="info-value">${item.po_number}</span></div>
+                            <div class="info-row"><span class="info-label">Part:</span><span class="info-value">${item.part_number}</span></div>
+                            <div class="info-row"><span class="info-label">Stage:</span><span class="info-value">${item.stage_name}</span></div>
+                            <div class="info-row"><span class="info-label">Quantity:</span><span class="info-value">${item.quantity} units</span></div>
+                            <div class="info-row"><span class="info-label">PO Item ID:</span><span class="info-value" style="color: #667eea;">${item.po_item_id}</span></div>
                         </div>
                     `;
                 });
             } else {
-                html += '<p style="margin-top: 15px; color: #666; text-align: center;">Bin is empty</p>';
+                html += '<p style="margin-top: 15px; color: #999; text-align: center;">✓ Bin is empty</p>';
             }
             
             details.innerHTML = html;
@@ -361,7 +263,7 @@
             const scannedBy = document.getElementById('scannedBy').value.trim();
             
             if (!fromBin || !toBin || !poItemId) {
-                showAlert('Please fill in all required fields', 'error');
+                showAlert('Please fill From Bin, To Bin, and PO Item ID', 'error');
                 return;
             }
             
@@ -382,9 +284,9 @@
                 const data = await response.json();
                 
                 if (data.success) {
-                    showAlert(`Transfer successful! Material moved to ${data.transfer.next_stage}`, 'success');
+                    const t = data.transfer;
+                    showAlert(`✓ Transfer complete! ${t.quantity} units from ${t.from_stage} → ${t.to_stage}`, 'success');
                     hideTransferForm();
-                    // Clear form
                     document.getElementById('fromBin').value = '';
                     document.getElementById('toBin').value = '';
                     document.getElementById('poItemId').value = '';
@@ -402,12 +304,9 @@
             const alertArea = document.getElementById('alertArea');
             const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
             alertArea.innerHTML = `<div class="alert ${alertClass}">${message}</div>`;
-            setTimeout(() => {
-                alertArea.innerHTML = '';
-            }, 5000);
+            setTimeout(() => { alertArea.innerHTML = ''; }, 5000);
         }
         
-        // Focus on barcode input
         document.getElementById('barcodeInput').focus();
     </script>
 </body>
