@@ -3,10 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Micron Production Tracking</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <title>Dashboard - Micron Tracking</title>
     <script src="/components/header.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -24,17 +21,8 @@
             margin-bottom: 20px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        .page-header h1 { color: #333; }
+        .page-header h1 { color: #333; margin-bottom: 5px; }
         .page-header p { color: #666; font-size: 14px; }
-        .error-banner {
-            background: #fee;
-            border: 2px solid #fcc;
-            color: #c00;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        .error-banner h3 { margin-bottom: 10px; }
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -46,9 +34,10 @@
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
         }
         .stat-card h3 {
-            font-size: 14px;
+            font-size: 13px;
             color: #666;
             margin-bottom: 10px;
             text-transform: uppercase;
@@ -58,6 +47,7 @@
             font-weight: bold;
             color: #333;
         }
+        .stat-card.primary .value { color: #667eea; }
         .stat-card.good .value { color: #10b981; }
         .stat-card.rework .value { color: #f59e0b; }
         .stat-card.rejected .value { color: #ef4444; }
@@ -66,16 +56,13 @@
             grid-template-columns: 300px 1fr;
             gap: 20px;
         }
-        .sidebar {
+        .card {
             background: white;
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            height: fit-content;
-            max-height: 80vh;
-            overflow-y: auto;
         }
-        .sidebar h2 { font-size: 18px; margin-bottom: 15px; color: #333; }
+        .card h2 { font-size: 18px; margin-bottom: 15px; color: #333; }
         .part-list { list-style: none; }
         .part-item {
             padding: 12px;
@@ -85,235 +72,176 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        .part-item:hover {
-            background: #e5e7eb;
-            transform: translateX(5px);
-        }
-        .part-item.active { background: #667eea; color: white; }
-        .part-item .part-number { font-weight: bold; font-size: 14px; }
-        .part-item .part-info { font-size: 12px; margin-top: 4px; opacity: 0.8; }
-        .dashboard {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .dashboard h2 { margin-bottom: 20px; color: #333; }
-        .stage-flow { display: flex; flex-direction: column; gap: 15px; }
-        .stage-card {
+        .part-item:hover { background: #e5e7eb; transform: translateX(3px); }
+        .part-item .part-number { font-weight: 600; font-size: 14px; color: #333; }
+        .part-item .part-info { font-size: 12px; margin-top: 4px; color: #666; }
+        .po-card {
             background: #f9fafb;
             border: 2px solid #e5e7eb;
             border-radius: 8px;
             padding: 15px;
+            margin-bottom: 15px;
             transition: all 0.3s;
         }
-        .stage-card:hover {
-            border-color: #667eea;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
-        }
-        .stage-header {
+        .po-card:hover { border-color: #667eea; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2); }
+        .po-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e5e7eb;
         }
-        .stage-name { font-weight: bold; color: #333; font-size: 16px; }
-        .stage-order {
-            background: #667eea;
-            color: white;
+        .po-title { font-weight: 600; color: #333; font-size: 16px; }
+        .status-badge {
             padding: 4px 12px;
-            border-radius: 20px;
+            border-radius: 12px;
             font-size: 12px;
+            font-weight: 600;
+            background: #dbeafe;
+            color: #1e40af;
         }
-        .stage-metrics {
+        .po-stats {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 10px;
             margin-top: 10px;
         }
-        .metric { text-align: center; padding: 8px; background: white; border-radius: 6px; }
-        .metric-label { font-size: 11px; color: #666; text-transform: uppercase; }
-        .metric-value { font-size: 20px; font-weight: bold; margin-top: 4px; }
-        .metric.good .metric-value { color: #10b981; }
-        .metric.rework .metric-value { color: #f59e0b; }
-        .metric.rejected .metric-value { color: #ef4444; }
-        .metric.total .metric-value { color: #3b82f6; }
-        .bins-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb; }
-        .bins-title { font-size: 12px; color: #666; margin-bottom: 8px; font-weight: 600; }
-        .bin-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-        .bin-tag {
-            background: #dbeafe;
-            color: #1e40af;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 500;
-        }
+        .po-stat { text-align: center; }
+        .po-stat-label { font-size: 11px; color: #666; }
+        .po-stat-value { font-size: 18px; font-weight: bold; color: #333; margin-top: 4px; }
         .loading { text-align: center; padding: 40px; color: white; font-size: 18px; }
         .empty-state { text-align: center; padding: 60px 20px; color: #666; }
-        .empty-state h3 { margin-bottom: 10px; color: #333; }
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .btn-primary { background: #667eea; color: white; }
-        .btn-primary:hover { background: #5568d3; }
+        .error-msg { background: #fee; color: #c00; padding: 15px; border-radius: 8px; margin: 20px 0; }
     </style>
 </head>
 <body>
-    <div class="container" id="root"></div>
+    <div class="container"></div>
     
     <script>
-        // Add navigation header
-        initNavigation('dashboard');
-    </script>
-    
-    <script type="text/babel">
-        const { useState, useEffect } = React;
-        const API_BASE = '/api';
+        // Initialize navigation FIRST
+        document.addEventListener('DOMContentLoaded', () => {
+            initNavigation('dashboard');
+            loadDashboard();
+        });
         
-        function App() {
-            const [loading, setLoading] = useState(true);
-            const [error, setError] = useState(null);
-            const [dashboardData, setDashboardData] = useState(null);
-            const [selectedPart, setSelectedPart] = useState(null);
+        async function loadDashboard() {
+            const container = document.querySelector('.container');
             
-            useEffect(() => {
-                loadDashboard();
-                const interval = setInterval(loadDashboard, 10000);
-                return () => clearInterval(interval);
-            }, []);
-            
-            const loadDashboard = async () => {
-                try {
-                    setError(null);
-                    const response = await fetch(`${API_BASE}/dashboard.php`);
-                    
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        throw new Error(`Server returned ${response.status}: ${errorText}`);
-                    }
-                    
-                    const data = await response.json();
-                    
-                    if (!data.success) {
-                        throw new Error(data.error || 'Failed to load dashboard');
-                    }
-                    
-                    setDashboardData(data);
-                    if (!selectedPart && data.parts && data.parts.length > 0) {
-                        setSelectedPart(data.parts[0]);
-                    }
-                    setLoading(false);
-                } catch (error) {
-                    console.error('Failed to load dashboard:', error);
-                    setError(error.message);
-                    setLoading(false);
+            try {
+                // Show loading
+                const existingContent = container.querySelector('.main-content');
+                if (!existingContent) {
+                    container.innerHTML += '<div class="loading">⏳ Loading...</div>';
                 }
-            };
-            
-            if (loading) {
-                return <div className="loading">⏳ Loading dashboard...</div>;
-            }
-            
-            if (error) {
-                return (
-                    <div>
-                        <div className="error-banner">
-                            <h3>❌ Error Loading Dashboard</h3>
-                            <p><strong>{error}</strong></p>
-                            <button onClick={loadDashboard} className="btn btn-primary" style={{marginTop: '15px'}}>
-                                Retry
-                            </button>
-                        </div>
-                    </div>
-                );
-            }
-            
-            if (!dashboardData || !dashboardData.parts) {
-                return (
-                    <div className="empty-state">
-                        <h3>No data available</h3>
-                        <p>Import complete_parts_insertion.sql to add parts</p>
-                    </div>
-                );
-            }
-            
-            const stats = dashboardData.stats || {};
-            const parts = dashboardData.parts || [];
-            
-            return (
-                <div>
-                    <div className="page-header">
+                
+                const res = await fetch('/api/dashboard.php');
+                if (!res.ok) throw new Error(`Server error: ${res.status}`);
+                
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error || 'Failed to load');
+                
+                // Remove loading
+                const loading = container.querySelector('.loading');
+                if (loading) loading.remove();
+                
+                const stats = data.stats || {};
+                const pos = data.purchase_orders || [];
+                const parts = data.parts || [];
+                
+                // Build dashboard HTML
+                const dashboardHTML = `
+                    <div class="page-header">
                         <h1>📊 Production Dashboard</h1>
-                        <p>Real-time inventory and stage tracking</p>
+                        <p>Real-time tracking across ${pos.length} purchase orders and ${parts.length} parts</p>
                     </div>
                     
-                    <div className="stats-grid">
-                        <div className="stat-card">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3>Purchase Orders</h3>
+                            <div class="value">${pos.length}</div>
+                        </div>
+                        <div class="stat-card primary">
                             <h3>Total Ordered</h3>
-                            <div className="value">{stats.total_ordered || 0}</div>
+                            <div class="value">${stats.total_ordered || 0}</div>
                         </div>
-                        <div className="stat-card good">
+                        <div class="stat-card good">
                             <h3>Produced</h3>
-                            <div className="value">{stats.total_produced || 0}</div>
+                            <div class="value">${stats.total_produced || 0}</div>
                         </div>
-                        <div className="stat-card rework">
-                            <h3>Rework</h3>
-                            <div className="value">{stats.total_rework || 0}</div>
-                        </div>
-                        <div className="stat-card rejected">
+                        <div class="stat-card rejected">
                             <h3>Rejected</h3>
-                            <div className="value">{stats.total_rejected || 0}</div>
+                            <div class="value">${stats.total_rejected || 0}</div>
                         </div>
                     </div>
                     
-                    <div className="main-content">
-                        <div className="sidebar">
-                            <h2>Parts ({parts.length})</h2>
-                            {parts.length === 0 ? (
-                                <p style={{color: '#666', fontSize: '14px'}}>No parts found</p>
-                            ) : (
-                                <ul className="part-list">
-                                    {parts.map(part => (
-                                        <li 
-                                            key={part.id}
-                                            className={`part-item ${selectedPart?.id === part.id ? 'active' : ''}`}
-                                            onClick={() => setSelectedPart(part)}
-                                        >
-                                            <div className="part-number">{part.part_number}</div>
-                                            <div className="part-info">
-                                                {part.total_stages} stages
-                                            </div>
+                    <div class="main-content">
+                        <div class="card">
+                            <h2>Parts (${parts.length})</h2>
+                            ${parts.length === 0 ? '<p style="color:#999;padding:20px;text-align:center;">No parts found. Import parts.sql</p>' : `
+                                <ul class="part-list">
+                                    ${parts.map(p => `
+                                        <li class="part-item">
+                                            <div class="part-number">${p.part_number}</div>
+                                            <div class="part-info">${p.part_name || ''} · ${p.total_stages || 0} stages</div>
                                         </li>
-                                    ))}
+                                    `).join('')}
                                 </ul>
-                            )}
+                            `}
                         </div>
                         
-                        <div className="dashboard">
-                            {selectedPart ? (
-                                <>
-                                    <h2>📈 {selectedPart.part_number} - Stage View</h2>
-                                    <p style={{color: '#666', marginBottom: '20px'}}>{selectedPart.part_name}</p>
-                                </>
-                            ) : (
-                                <div className="empty-state">
-                                    <h3>Select a part to view details</h3>
-                                </div>
-                            )}
+                        <div class="card">
+                            <h2>Purchase Orders</h2>
+                            ${pos.length === 0 ? '<p style="color:#999;padding:20px;text-align:center;">No purchase orders yet. <a href="/admin.html">Create one</a></p>' : `
+                                ${pos.map(po => `
+                                    <div class="po-card">
+                                        <div class="po-header">
+                                            <div class="po-title">${po.po_number}</div>
+                                            <span class="status-badge">${po.status}</span>
+                                        </div>
+                                        <div style="color:#666;font-size:13px;margin-bottom:10px;">${po.customer_name}</div>
+                                        <div class="po-stats">
+                                            <div class="po-stat">
+                                                <div class="po-stat-label">Items</div>
+                                                <div class="po-stat-value">${po.total_items || 0}</div>
+                                            </div>
+                                            <div class="po-stat">
+                                                <div class="po-stat-label">Ordered</div>
+                                                <div class="po-stat-value">${po.total_ordered || 0}</div>
+                                            </div>
+                                            <div class="po-stat">
+                                                <div class="po-stat-label">Progress</div>
+                                                <div class="po-stat-value" style="color:#10b981;">${Math.round((po.total_produced || 0) / (po.total_ordered || 1) * 100)}%</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            `}
                         </div>
                     </div>
-                </div>
-            );
+                `;
+                
+                // Append dashboard (header already exists from initNavigation)
+                const existing = container.querySelector('.main-content');
+                if (existing) {
+                    existing.parentElement.remove();
+                }
+                container.innerHTML += dashboardHTML;
+                
+            } catch (error) {
+                console.error('Dashboard error:', error);
+                container.innerHTML += `
+                    <div class="error-msg">
+                        <h3>❌ Error Loading Dashboard</h3>
+                        <p>${error.message}</p>
+                        <p style="margin-top:10px;font-size:13px;">Check: Database imported? API config correct?</p>
+                    </div>
+                `;
+            }
         }
         
-        ReactDOM.render(<App />, document.getElementById('root'));
+        // Auto-refresh every 30 seconds
+        setInterval(loadDashboard, 30000);
     </script>
 </body>
 </html>
