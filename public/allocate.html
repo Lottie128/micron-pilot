@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Allocate Material - Micron Tracking</title>
+    <script src="/components/header.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        .card h2 { margin-bottom: 20px; color: #333; }
+        .po-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .po-card {
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .po-card:hover { border-color: #667eea; transform: translateY(-2px); }
+        .po-card.selected { border-color: #667eea; background: #f0f9ff; }
+        .po-title { font-weight: 600; color: #333; margin-bottom: 5px; }
+        .po-stat { font-size: 13px; color: #666; margin: 3px 0; }
+        .po-remaining {
+            font-size: 20px;
+            font-weight: bold;
+            color: #667eea;
+            margin-top: 10px;
+        }
+        .form-group { margin-bottom: 15px; }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5568d3; }
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .alert-success { background: #d1fae5; color: #065f46; }
+        .alert-error { background: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <script>initNavigation('admin');</script>
+        
+        <div class="card">
+            <h2>📦 Allocate Material from PO to Bins</h2>
+            <p style="color: #666; margin-bottom: 20px;">Select a PO item with remaining material, then allocate to an incoming bin</p>
+            
+            <div id="alertArea"></div>
+            
+            <h3 style="margin-bottom: 15px;">Available PO Items</h3>
+            <div id="poGrid" class="po-grid">
+                <p style="text-align: center; color: #999; padding: 40px;">Loading...</p>
+            </div>
+            
+            <div id="allocationForm" style="display: none;">
+                <h3 style="margin-bottom: 15px;">Allocate to Bin</h3>
+                <div class="form-group">
+                    <label>Bin Barcode (Scan or Type)</label>
+                    <input type="text" id="binBarcode" placeholder="BIN-0001" />
+                </div>
+                <div class="form-group">
+                    <label>Quantity to Allocate (Max: <span id="maxQty">200</span>)</label>
+                    <input type="number" id="quantity" value="200" min="1" />
+                </div>
+                <div class="form-group">
+                    <label>Operator Name</label>
+                    <input type="text" id="operator" value="Operator" />
+                </div>
+                <button class="btn btn-primary" onclick="allocateMaterial()">Allocate Material</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let selectedPoItem = null;
+        
+        async function loadPOItems() {
+            const res = await fetch('/api/po_items_remaining.php');
+            const data = await res.json();
+            const grid = document.getElementById('poGrid');
+            
+            if (!data.success || !data.po_items || data.po_items.length === 0) {
+                grid.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">No PO items with remaining material</p>';
+                return;
+            }
+            
+            grid.innerHTML = data.po_items.map(item => {
+                const remaining = item.ordered_quantity - item.allocated_quantity;
+                if (remaining <= 0) return '';
+                return `
+                    <div class="po-card" onclick="selectPO(${item.id}, ${remaining})">
+                        <div class="po-title">${item.po_number}</div>
+                        <div class="po-stat">Part: ${item.part_number}</div>
+                        <div class="po-stat">Ordered: ${item.ordered_quantity} units</div>
+                        <div class="po-stat">Allocated: ${item.allocated_quantity} units</div>
+                        <div class="po-remaining">${remaining} units remaining</div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function selectPO(poItemId, remaining) {
+            selectedPoItem = poItemId;
+            document.querySelectorAll('.po-card').forEach(c => c.classList.remove('selected'));
+            event.target.closest('.po-card').classList.add('selected');
+            document.getElementById('allocationForm').style.display = 'block';
+            document.getElementById('maxQty').textContent = Math.min(remaining, 200);
+            document.getElementById('quantity').max = Math.min(remaining, 200);
+            document.getElementById('quantity').value = Math.min(remaining, 200);
+        }
+        
+        async function allocateMaterial() {
+            if (!selectedPoItem) {
+                showAlert('Please select a PO item first', 'error');
+                return;
+            }
+            
+            const binBarcode = document.getElementById('binBarcode').value.trim();
+            const quantity = parseInt(document.getElementById('quantity').value);
+            const operator = document.getElementById('operator').value.trim();
+            
+            if (!binBarcode) {
+                showAlert('Please enter bin barcode', 'error');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/allocate_material.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        bin_barcode: binBarcode,
+                        po_item_id: selectedPoItem,
+                        quantity: quantity,
+                        operator: operator
+                    })
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    const a = data.allocation;
+                    showAlert(`✓ Allocated ${a.allocated} units to ${a.bin}. Remaining in PO: ${a.remaining_in_po}`, 'success');
+                    document.getElementById('binBarcode').value = '';
+                    loadPOItems();
+                    document.getElementById('allocationForm').style.display = 'none';
+                    selectedPoItem = null;
+                } else {
+                    showAlert('Allocation failed: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            }
+        }
+        
+        function showAlert(message, type) {
+            const alertArea = document.getElementById('alertArea');
+            const alertClass = type === 'success' ? 'alert-success' : 'alert-error';
+            alertArea.innerHTML = `<div class="alert ${alertClass}">${message}</div>`;
+            setTimeout(() => { alertArea.innerHTML = ''; }, 5000);
+        }
+        
+        loadPOItems();
+    </script>
+</body>
+</html>

@@ -5,7 +5,7 @@ $conn = getDBConnection();
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method === 'GET') {
-    // Get all purchase orders with items
+    // Get all purchase orders with remaining quantities
     try {
         $query = "
             SELECT po.*, 
@@ -13,7 +13,9 @@ if ($method === 'GET') {
                    SUM(poi.ordered_quantity) as total_ordered,
                    SUM(poi.produced_quantity) as total_produced,
                    SUM(poi.rejected_quantity) as total_rejected,
-                   SUM(poi.rework_quantity) as total_rework
+                   SUM(poi.rework_quantity) as total_rework,
+                   SUM(poi.allocated_quantity) as total_allocated,
+                   SUM(poi.ordered_quantity - poi.allocated_quantity) as total_remaining
             FROM purchase_orders po
             LEFT JOIN po_items poi ON po.id = poi.po_id
             GROUP BY po.id
@@ -32,7 +34,7 @@ if ($method === 'GET') {
     }
     
 } elseif ($method === 'POST') {
-    // Create new purchase order with auto bin splitting
+    // Create new purchase order WITHOUT pre-allocating to bins
     $data = json_decode(file_get_contents('php://input'), true);
     
     try {
@@ -53,7 +55,8 @@ if ($method === 'GET') {
         
         $po_id = $conn->lastInsertId();
         
-        // Create PO items and auto-split into bins
+        // Create PO items WITHOUT allocating to bins
+        // Material stays in virtual PO queue until manually allocated
         foreach ($data['items'] as $item) {
             $part_id = $item['part_id'];
             $quantity = $item['quantity'];
@@ -72,82 +75,20 @@ if ($method === 'GET') {
                 throw new Exception("No stages found for part ID: $part_id");
             }
             
-            // Create PO item
+            // Create PO item with allocated_quantity = 0 (nothing allocated yet)
             $item_stmt = $conn->prepare("
-                INSERT INTO po_items (po_id, part_id, ordered_quantity, current_stage_id, status)
-                VALUES (?, ?, ?, ?, 'in_progress')
+                INSERT INTO po_items 
+                (po_id, part_id, ordered_quantity, allocated_quantity, produced_quantity, current_stage_id, status)
+                VALUES (?, ?, ?, 0, 0, ?, 'not_started')
             ");
             $item_stmt->execute([$po_id, $part_id, $quantity, $first_stage['id']]);
-            
-            $po_item_id = $conn->lastInsertId();
-            
-            // AUTO-SPLIT INTO BINS (200 units per bin max)
-            $bin_capacity = 200;
-            $remaining = $quantity;
-            $bin_index = 0;
-            
-            while ($remaining > 0) {
-                $bin_qty = min($remaining, $bin_capacity);
-                
-                // Find next available bin in INCOMING zone
-                $bin_stmt = $conn->prepare("
-                    SELECT b.id, b.bin_barcode, b.capacity,
-                           COALESCE(SUM(bi.quantity), 0) as used_capacity
-                    FROM bins b
-                    LEFT JOIN bin_inventory bi ON b.id = bi.bin_id
-                    WHERE b.zone = 'INCOMING' AND b.status = 'active'
-                    GROUP BY b.id
-                    HAVING (b.capacity - used_capacity) >= ?
-                    ORDER BY b.bin_barcode ASC
-                    LIMIT 1
-                ");
-                $bin_stmt->execute([$bin_qty]);
-                $bin = $bin_stmt->fetch();
-                
-                if (!$bin) {
-                    throw new Exception("No available bins with capacity for $bin_qty units. Please free up bins.");
-                }
-                
-                // Add to bin inventory
-                $inv_stmt = $conn->prepare("
-                    INSERT INTO bin_inventory (bin_id, po_item_id, stage_id, quantity, good_quantity)
-                    VALUES (?, ?, ?, ?, ?)
-                    ON DUPLICATE KEY UPDATE
-                    quantity = quantity + VALUES(quantity),
-                    good_quantity = good_quantity + VALUES(good_quantity)
-                ");
-                $inv_stmt->execute([
-                    $bin['id'],
-                    $po_item_id,
-                    $first_stage['id'],
-                    $bin_qty,
-                    $bin_qty
-                ]);
-                
-                // Record movement
-                $mov_stmt = $conn->prepare("
-                    INSERT INTO movements 
-                    (po_item_id, to_bin_id, to_stage_id, quantity_moved, transfer_type, notes)
-                    VALUES (?, ?, ?, ?, 'incoming', ?)
-                ");
-                $mov_stmt->execute([
-                    $po_item_id,
-                    $bin['id'],
-                    $first_stage['id'],
-                    $bin_qty,
-                    "Auto-split: Bin " . ($bin_index + 1) . " of " . ceil($quantity / $bin_capacity)
-                ]);
-                
-                $remaining -= $bin_qty;
-                $bin_index++;
-            }
         }
         
         $conn->commit();
         
         sendJSON([
             'success' => true,
-            'message' => 'Purchase order created successfully',
+            'message' => 'Purchase order created. Material in queue, ready for allocation.',
             'po_id' => $po_id,
             'po_number' => $data['po_number']
         ]);
